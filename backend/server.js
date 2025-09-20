@@ -1,35 +1,48 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const mysql = require('mysql2');
+const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(bodyParser.json());
 
-// MongoDB connection
-mongoose.connect('mongodb://mongo:27017/notesapp', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// MySQL connection
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'notes_user',
+  password: 'notes_password',
+  database: 'notes_db'
 });
 
-// Schema
-const NoteSchema = new mongoose.Schema({
-  title: String,
-  content: String,
+db.connect(err => {
+  if (err) throw err;
+  console.log('MySQL Connected...');
 });
-const Note = mongoose.model('Note', NoteSchema);
 
 // Routes
-app.get('/notes', async (req, res) => {
-  const notes = await Note.find();
-  res.json(notes);
+app.get('/notes', (req, res) => {
+  db.query('SELECT * FROM notes', (err, results) => {
+    if (err) throw err;
+    res.json(results);
+  });
 });
 
-app.post('/notes', async (req, res) => {
-  const note = new Note(req.body);
-  await note.save();
-  res.json(note);
+app.post('/notes', (req, res) => {
+  const { title, content } = req.body;
+  db.query('INSERT INTO notes(title, content) VALUES(?, ?)', [title, content], (err, result) => {
+    if (err) throw err;
+    res.json({ id: result.insertId, title, content });
+  });
 });
 
-app.listen(5000, () => console.log('Backend running on port 5000'));
+app.delete('/notes/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM notes WHERE id=?', [id], (err, result) => {
+    if (err) throw err;
+    res.json({ message: 'Note deleted' });
+  });
+});
+
+app.listen(5000, () => console.log('Server running on port 5000'));
 
